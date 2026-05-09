@@ -1,0 +1,17 @@
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: app
+spec:
+  endpointSelector:
+    matchLabels: {}
+  ingress:
+  - fromEndpoints:
+    - matchLabels:
+        k8s:io.kubernetes.pod.namespace: infra-envoy-gateway
+        app.kubernetes.io/name: envoy
+    toPorts:
+    - ports:
+      - port: "8080"
+        protocol: TCP

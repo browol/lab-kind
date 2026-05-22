@@ -3,7 +3,6 @@ apiVersion: kind.x-k8s.io/v1alpha4
 name: local-cluster
 networking:
   disableDefaultCNI: true
-  kubeProxyMode: none
 nodes:
 - role: control-plane
 - role: worker

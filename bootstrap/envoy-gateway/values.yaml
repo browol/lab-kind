@@ -1,1 +1,6 @@
 # Default values for envoy-gateway
+crds:
+  gatewayAPI:
+    enabled: false
+  envoyGateway:
+    enabled: true

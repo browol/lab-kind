@@ -1,14 +1,19 @@
 CLUSTER_NAME := local-cluster
 
-.PHONY: start-kind start-cilium start-envoy start-test-app start stop
+.PHONY: help
+help: ## Display this help.
+	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
-start: start-kind start-cilium start-envoy start-test-app
+.PHONY: start
+start: start-kind start-cilium start-envoy start-test-app ## Start the entire environment: kind cluster, Cilium, Envoy Gateway, and test app.
 
-start-kind:
+.PHONY: start-kind
+start-kind: ## Start a local Kubernetes cluster using kind.
 	@echo "Creating kind cluster..."
 	kind create cluster --name $(CLUSTER_NAME) --config bootstrap/kind/config.yaml
 
-start-cilium:
+.PHONY: start-cilium
+start-cilium: ## Install Cilium CNI in the kind cluster.
 	@echo "Installing Cilium..."
 	helm repo add cilium https://helm.cilium.io/ || true
 	helm repo update cilium
@@ -18,20 +23,35 @@ start-cilium:
 	@echo "Waiting for Cilium to be ready..."
 	kubectl rollout status -n infra-cilium ds/cilium -w
 
-start-envoy:
+.PHONY: start-envoy
+start-envoy: ## Install Envoy Gateway in the kind cluster.
+	@echo "Pulling EG chart to extract CRDs..."
+	helm pull oci://docker.io/envoyproxy/gateway-helm --version 1.8.0 \
+		--untar --destination charts/ || echo "Chart already exists, skipping pull."
+	@echo "Applying Gateway API CRDs..."
+	kubectl apply --server-side=true \
+		-f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.5.1/standard-install.yaml
+	@echo "Applying Envoy Gateway CRDs..."
+	kubectl apply --server-side=true \
+		-f charts/gateway-helm/charts/crds/crds/generated/
+	@echo "Waiting for CRDs to be established..."
+	kubectl wait --for=condition=established --all crd --timeout=60s
+	@echo "Cleaning up chart files..."
+	rm -r charts/
 	@echo "Installing Envoy Gateway..."
 	helm upgrade --install eg oci://docker.io/envoyproxy/gateway-helm \
-		--version 1.7.2 \
+		--version 1.8.0 \
 		--create-namespace -n infra-envoy-gateway \
-		-f bootstrap/envoy-gateway/values.yaml --wait
-	@echo "Applying Gateway API CRDs..."
-	kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.1.0/standard-install.yaml
+		-f bootstrap/envoy-gateway/values.yaml \
+		--skip-crds \
+		--wait
 	@echo "Applying EnvoyProxy config for NodePort..."
 	kubectl apply -f bootstrap/envoy-gateway/envoyproxy.yaml
 	@echo "Applying GatewayClass..."
 	kubectl apply -f bootstrap/envoy-gateway/gatewayclass.yaml
 
-start-test-app:
+.PHONY: start-test-app
+start-test-app: ## Deploy a simple nginx test application in the cluster.
 	@echo "Deploying nginx test app..."
 	kubectl apply -f bootstrap/test-app/namespace.yaml
 	@echo "Applying default Gateway in app namespace..."
@@ -39,6 +59,7 @@ start-test-app:
 	kubectl apply -f bootstrap/test-app/policy.yaml
 	kubectl apply -f bootstrap/test-app/nginx.yaml
 
-stop:
+.PHONY: stop
+stop: ## Stop the entire environment by deleting the kind cluster.
 	@echo "Deleting kind cluster..."
 	kind delete cluster --name $(CLUSTER_NAME)

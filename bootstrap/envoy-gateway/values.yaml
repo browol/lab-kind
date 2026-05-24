@@ -1,6 +1,10 @@
 # Default values for envoy-gateway
-crds:
-  gatewayAPI:
-    enabled: false
+config:
   envoyGateway:
-    enabled: true
+    gateway:
+      controllerName: gateway.envoyproxy.io/gatewayclass-controller
+    provider:
+      type: Kubernetes
+    logging:
+      level:
+        default: info

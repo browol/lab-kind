@@ -43,8 +43,6 @@ start-cloud-provider: ## Start cloud-provider-kind daemon.
 		$(CPK_IMAGE):$(CPK_VERSION) \
 		--enable-lb-port-mapping --gateway-channel disabled
 	sleep 2
-	kubectl label node $(CLUSTER_NAME)-control-plane \
-		node.kubernetes.io/exclude-from-external-load-balancers- --overwrite || true
 
 ##@ Gateway
 .PHONY: start-envoy-crds

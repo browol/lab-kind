@@ -134,8 +134,6 @@ start-cloud-provider: ## Start cloud-provider-kind daemon.
 		$(CPK_IMAGE):$(CPK_VERSION) \
 		--enable-lb-port-mapping --gateway-channel disabled
 	sleep 2
-	kubectl label node $(CLUSTER_NAME)-control-plane \
-		node.kubernetes.io/exclude-from-external-load-balancers- --overwrite || true
 
 ##@ Gateway
 .PHONY: start-envoy-crds
@@ -191,9 +189,8 @@ test: ## Verify routing by curling nginx through the Gateway.
 | Binary requires sudo on macOS | Switched to container approach (`docker run`) — no sudo needed |
 | cloud-provider-kind v0.10.0 bundles GW API CRDs | Added `--force-conflicts` to upstream GW API CRD apply |
 | Orphaned `kindccm-*` proxy containers after stop | Added cleanup in `stop`: `docker rm -f $(docker ps -q --filter "name=kindccm")` |
-| `exclude-from-external-load-balancers` label absent on kind v1.35 | `|| true` on label removal handles both cases |
-| `helm pull --untar` fails if `charts/` already exists | `rm -r charts/` after CRD extraction + `start-envoy` depends on `start-envoy-crds` which always cleans up first |
-| **`externalTrafficPolicy: Local` + multi-node = flaky RANDOM LB** | Envoy Gateway defaults the LB service to `Local` for client IP preservation. With 3 nodes and only 1 hosting the Envoy pod, 2/3 NodePorts are dead. cloud-provider-kind adds all 3 nodes to the LB pool with `RANDOM` policy → 66% failure rate. **Fix:** EnvoyProxy patch sets `externalTrafficPolicy: Cluster` so all node NodePorts work. |
+
+| `helm pull --untar` fails if `charts/` already exists | `rm -r charts/` after CRD extraction + `start-envoy` depends on `start-envoy-crds` which always cleans up first || **`externalTrafficPolicy: Local` + multi-node = flaky RANDOM LB** | Envoy Gateway defaults the LB service to `Local` for client IP preservation. With 3 nodes and only 1 hosting the Envoy pod, 2/3 NodePorts are dead. cloud-provider-kind adds all 3 nodes to the LB pool with `RANDOM` policy → 66% failure rate. **Fix:** EnvoyProxy patch sets `externalTrafficPolicy: Cluster` so all node NodePorts work. |
 | **CPK restart crashes on GW API CRD downgrade** | CPK v0.10.0 bundles GW API CRDs older than v1.5.1. Our v1.5.1 `safe-upgrades` validating admission policy blocks the downgrade on CPK restart, causing CPK's cloud controller to fail to start. **Fix:** `--gateway-channel disabled` flag on CPK container — we use Envoy Gateway's Gateway API, not CPK's. |
 | **Docker Desktop macOS port mapping can stale** | After proxy container recreation, host port forwarding sometimes stops working (Docker Desktop / vpnkit known issue). Restarting the proxy container (via CPK restart) fixes it. |
 

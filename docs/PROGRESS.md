@@ -1,3 +1,60 @@
+## 2026-05-24 — Fix flaky `make test`: externalTrafficPolicy + CPK gateway channel
+
+**Status:** `make test` now passes 5/5 consecutive runs. Two root causes identified and fixed.
+
+**Done:**
+- **Bug 1: `externalTrafficPolicy: Local` causes RANDOM LB flakiness.** Envoy Gateway defaults the LB service to `Local` for client IP preservation. With 3 nodes and only 1 hosting the Envoy pod, 2/3 NodePorts are dead. cloud-provider-kind adds all 3 nodes to the LB pool with `RANDOM` policy → 66% of connections hit dead nodes. **Fix:** Added `externalTrafficPolicy: Cluster` patch to `bootstrap/envoy-gateway/envoyproxy.yaml`.
+- **Bug 2: CPK restart crashes on GW API CRD version conflict.** CPK v0.10.0 bundles older Gateway API CRDs that conflict with our v1.5.1 installation (the v1.5.1 `safe-upgrades` validating admission policy blocks downgrade). On CPK restart, this causes: `Failed to start cloud controller: Installing CRDs with version before v1.5.0 is prohibited`. **Fix:** Added `--gateway-channel disabled` flag to CPK container — we use Envoy Gateway for Gateway API, not CPK's built-in implementation.
+- Updated `Makefile`: `start-cloud-provider` includes `--gateway-channel disabled`.
+- Ran 5x consecutive `make test` — all passed.
+- Full fresh bootstrap from scratch (`make start` → `make test` → `make stop`) verified.
+
+**Next:**
+- None.
+
+**Blockers:** None
+
+**Open questions:** None
+
+---
+
+## 2026-05-24 — cloud-provider-kind Migration (NodePort → LoadBalancer)
+
+**Status:** Full migration implemented and verified. Architecture now uses cloud-provider-kind (container-based, no sudo) for LoadBalancer services instead of NodePort + kind `extraPortMappings`.
+
+**Done:**
+- Removed empty `bootstrap/metallb/` directory.
+- Updated `bootstrap/kind/config.yaml`: removed `extraPortMappings`, added second worker node.
+- Simplified `bootstrap/envoy-gateway/envoyproxy.yaml`: `type: LoadBalancer`, no NodePort patch.
+- Renamed `bootstrap/test-app/` files with numeric prefixes (`00-namespace.yaml`, `01-gateway.yaml`, `02-policy.yaml`, `03-nginx.yaml`) to support `kubectl apply -f bootstrap/test-app/` directory apply.
+- Rewrote `Makefile`:
+  - All versions/namespaces as variables (`CPK_VERSION`, `CPK_IMAGE`, etc.).
+  - `##@` headers for visual grouping (Cluster, Infrastructure, Gateway, Application, Orchestration, Verification).
+  - Split `start-envoy` into `start-envoy-crds` + `start-envoy` (each ~5 lines).
+  - `start-cloud-provider` uses Docker container approach (`docker run -d --network kind -v /var/run/docker.sock`), not host binary — avoids sudo requirement on macOS.
+  - `--force-conflicts` on GW API CRD apply (cloud-provider-kind v0.10.0 bundles its own GW API CRDs).
+  - New `test` target: auto-discovers ephemeral port via `docker port`, curls with `--resolve`.
+  - `stop` cleanly removes cluster + CPK container + `kindccm-*` proxy containers.
+- Updated `AGENTS.md` project structure tree.
+- Updated `docs/plan/01-bootstrap.md`: replaced NodePort with LoadBalancer + cloud-provider-kind, 2 workers, updated testing.
+- End-to-end verification:
+  - `make start-kind` — 3 nodes, no port bindings.
+  - `make start-cilium` — All Ready, 3/3 cilium pods.
+  - `make start-cloud-provider` — Container running, no sudo.
+  - `make start-envoy` — Envoy proxy as LoadBalancer, external IP assigned (172.18.0.6).
+  - `make start-test-app` — All resources created via directory apply.
+  - `make test` — HTTP 200 from nginx through full LB + Gateway + HTTPRoute chain.
+  - `make stop` — All containers removed, no remnants.
+
+**Next:**
+- None — plan complete.
+
+**Blockers:** None
+
+**Open questions:** None
+
+---
+
 ## 2026-05-22 — Add bookinfo.browol.io hostname to HTTPRoute
 
 **Status:** Added `bookinfo.browol.io` hostname filter to the nginx HTTPRoute.

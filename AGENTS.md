@@ -4,26 +4,33 @@
 
 - caveman skill
 - karparthy-guidelines skill
+- debug-mantra skill
 
 ## Project Structure
 
 ```
 bootstrap
 ├── cilium
-│   └── values.yaml
+│   └── values.yaml
+├── envoy-gateway
+│   ├── envoyproxy.yaml
+│   ├── gatewayclass.yaml
+│   └── values.yaml
 ├── kind
-│   └── config.yaml
+│   └── config.yaml
 └── test-app
-    ├── namespace.yaml
-    └── nginx.yaml
+    ├── 00-namespace.yaml
+    ├── 01-gateway.yaml
+    ├── 02-policy.yaml
+    └── 03-nginx.yaml
 Makefile
-docs/DESIGN.md
+docs/plan/{NN}-{name}.md
 docs/PROGRESS.md
 ```
 
 ## PLAN
 
-Read `docs/DESIGN.md` before starting any work. It contains the overall strategy, goals, and task breakdown for this project. Understanding the plan is crucial for effective progress tracking and decision-making.
+Read `docs/plan/{NN}-{name}.md` before starting any work. It contains the overall strategy, goals, and task breakdown for this project. Understanding the plan is crucial for effective progress tracking and decision-making.
 
 ## Progress Tracking
 

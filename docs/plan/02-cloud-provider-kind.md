@@ -44,7 +44,7 @@ nodes:
 apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: EnvoyProxy
 metadata:
-  name: default-proxy-config
+  name: default
   namespace: infra-envoy-gateway
 spec:
   provider:
